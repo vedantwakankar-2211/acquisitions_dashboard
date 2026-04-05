@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>New Acquisitions Dashboard — Delhi NCR</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
+:root{--bg:#06080f;--s1:#0d1117;--s2:#161c27;--s3:#1d2535;--bd:#232d42;--a1:#f97316;--a2:#22d3ee;--a3:#a78bfa;--a4:#34d399;--a5:#fb7185;--a6:#fbbf24;--tx:#e2e8f0;--tm:#64748b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font-family:'Space Grotesk',sans-serif;font-size:14px}
+
+/* ── LOADING SCREEN ── */
+#loader{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+.spin{width:40px;height:40px;border:3px solid var(--bd);border-top-color:var(--a1);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-txt{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--tm)}
+.load-file{font-size:11px;color:var(--a1);font-family:'JetBrains Mono',monospace;margin-top:4px}
+
+/* ── ERROR SCREEN ── */
+#error-screen{display:none;position:fixed;inset:0;background:var(--bg);z-index:998;align-items:center;justify-content:center}
+.err-box{background:var(--s1);border:1px solid var(--a5);border-radius:12px;padding:32px 40px;max-width:520px;text-align:center}
+.err-icon{font-size:40px;margin-bottom:16px}
+.err-title{font-size:18px;font-weight:700;color:var(--a5);margin-bottom:10px}
+.err-msg{font-size:13px;color:var(--tm);line-height:1.7;font-family:'JetBrains Mono',monospace}
+.err-hint{margin-top:16px;background:var(--s2);border-radius:8px;padding:14px;font-size:12px;color:var(--tm);text-align:left;line-height:1.8}
+.err-hint code{color:var(--a2);background:var(--s3);padding:1px 5px;border-radius:3px}
+
+/* ── HEADER ── */
+.hdr{background:linear-gradient(135deg,#0d1117,#111827);border-bottom:1px solid var(--bd);padding:18px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.hdr-l{display:flex;align-items:center;gap:14px}
+.logo{width:36px;height:36px;background:var(--a1);border-radius:8px;display:grid;place-items:center;font-size:18px}
+.hdr-title{font-size:17px;font-weight:700}.hdr-title span{color:var(--a1)}
+.hdr-sub{font-size:11px;color:var(--tm);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.hdr-r{display:flex;align-items:center;gap:10px}
+.badge{display:flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--bd);border-radius:20px;padding:6px 14px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--a4)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--a4);animation:p 2s infinite}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+.last-updated{font-size:10px;color:var(--tm);font-family:'JetBrains Mono',monospace}
+
+/* ── TABS ── */
+.tabs{background:var(--s1);border-bottom:1px solid var(--bd);padding:0 32px;display:flex;overflow-x:auto}
+.tab{padding:13px 18px;font-size:13px;font-weight:500;color:var(--tm);border:none;background:transparent;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:all .2s}
+.tab:hover{color:var(--tx)}.tab.on{color:var(--a1);border-bottom-color:var(--a1)}
+
+/* ── MAIN ── */
+main{padding:26px 32px;max-width:1600px}
+
+/* ── KPI ── */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:22px}
+.kpi{background:var(--s1);border:1px solid var(--bd);border-radius:11px;padding:18px;position:relative;overflow:hidden}
+.kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px}
+.kpi:nth-child(1)::after{background:var(--a1)}.kpi:nth-child(2)::after{background:var(--a2)}.kpi:nth-child(3)::after{background:var(--a3)}.kpi:nth-child(4)::after{background:var(--a4)}.kpi:nth-child(5)::after{background:var(--a5)}
+.kpi-l{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--tm);margin-bottom:10px}
+.kpi-v{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:500;line-height:1;margin-bottom:5px}
+.kpi-d{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--tm)}
+.kpi-d.up{color:var(--a4)}.kpi-d.dn{color:var(--a5)}
+
+/* ── GRIDS ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:18px}
+.g12{display:grid;grid-template-columns:2fr 1fr;gap:18px;margin-bottom:18px}
+.full{margin-bottom:18px}
+
+/* ── CARD ── */
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:11px;padding:20px 22px}
+.ch{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+.ct{font-size:14px;font-weight:600}.cs{font-size:11px;color:var(--tm);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.cbadge{font-size:10px;background:var(--s3);border:1px solid var(--bd);border-radius:5px;padding:2px 8px;color:var(--tm);margin-left:10px;flex-shrink:0}
+.caption{font-size:11px;color:var(--tm);margin-top:10px;padding-top:8px;border-top:1px solid var(--bd);font-style:italic;line-height:1.4}
+
+/* ── SECTION LABEL ── */
+.sl{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--tm);margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.sl::after{content:'';flex:1;height:1px;background:var(--bd)}
+
+/* ── INSIGHTS ── */
+.ins{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+.in{background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:14px;border-left:3px solid var(--a1)}
+.in.c2{border-left-color:var(--a2)}.in.c3{border-left-color:var(--a3)}.in.c4{border-left-color:var(--a4)}.in.c5{border-left-color:var(--a5)}.in.c6{border-left-color:var(--a6)}
+.in-t{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--tm);margin-bottom:7px}
+.in-v{font-size:20px;font-weight:700;font-family:'JetBrains Mono',monospace;margin-bottom:3px}
+.in-d{font-size:11px;color:var(--tm);line-height:1.4}
+
+/* ── HEATMAP ── */
+.hmw{overflow-x:auto}
+.hmt{border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:10px;min-width:100%}
+.hmt th{color:var(--tm);padding:5px 7px;text-align:center;white-space:nowrap;font-weight:400}
+.hmt td{width:50px;height:30px;text-align:center;border:1px solid var(--bg);cursor:default}
+.hmt td:hover{outline:1px solid rgba(255,255,255,.3)}
+.hml{color:var(--tm)!important;text-align:left!important;padding:5px 10px!important;white-space:nowrap;background:var(--s2)!important;width:80px}
+
+/* ── TABLE ── */
+.tw{overflow-x:auto;max-height:440px;overflow-y:auto}
+table.dt{width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:11px}
+table.dt thead th{position:sticky;top:0;background:var(--s2);color:var(--tm);padding:8px 11px;text-align:left;border-bottom:1px solid var(--bd);white-space:nowrap;font-size:10px;text-transform:uppercase}
+table.dt tbody tr{border-bottom:1px solid var(--bd)}
+table.dt tbody tr:hover{background:var(--s2)}
+table.dt td{padding:8px 11px}.dt td.r{text-align:right}.dt td.g{color:var(--a4);font-weight:500}.dt td.rd{color:var(--a5)}
+
+/* ── CONTRIBUTION CONTROLS ── */
+.ctrl-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:14px;background:var(--s2);border:1px solid var(--bd);border-radius:9px}
+.ctrl-row label{font-size:11px;color:var(--tm);text-transform:uppercase;letter-spacing:1px}
+.ctrl-row select{background:var(--s3);border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:7px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;cursor:pointer;outline:none}
+.ctrl-row select:focus{border-color:var(--a1)}
+.sep{width:1px;height:24px;background:var(--bd)}
+
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.g2,.g3,.g12{grid-template-columns:1fr}}
+@media(max-width:700px){main{padding:14px}.kpis{grid-template-columns:repeat(2,1fr)}.tabs,.hdr{padding-left:14px;padding-right:14px}}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loader">
+  <div class="spin"></div>
+  <div>
+    <div class="load-txt">Loading dashboard data…</div>
+    <div class="load-file">fetching data.csv</div>
+  </div>
+</div>
+
+<!-- ERROR -->
+<div id="error-screen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:998;display:none;align-items:center;justify-content:center">
+  <div class="err-box">
+    <div class="err-icon">⚠️</div>
+    <div class="err-title">Could not load data.csv</div>
+    <div class="err-msg" id="err-msg">Unknown error</div>
+    <div class="err-hint">
+      Make sure <code>data.csv</code> is in the <strong>same folder</strong> as this HTML file.<br><br>
+      Your folder should look like:<br>
+      <code>📁 acq-dashboard/</code><br>
+      <code>&nbsp;&nbsp;├── index.html</code><br>
+      <code>&nbsp;&nbsp;└── data.csv</code><br><br>
+      On GitHub Pages, both files must be committed to the same repo root.<br>
+      Opening the HTML file locally (file://) will also cause this error — use GitHub Pages or a local server.
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD (hidden until data loads) -->
+<div id="app" style="display:none">
+  <div class="hdr">
+    <div class="hdr-l">
+      <div class="logo">🍽️</div>
+      <div>
+        <div class="hdr-title">New <span>Acquisitions</span> Dashboard</div>
+        <div class="hdr-sub" id="hdr-sub">Delhi NCR · loading…</div>
+      </div>
+    </div>
+    <div class="hdr-r">
+      <div class="last-updated" id="last-updated"></div>
+      <div class="badge"><div class="dot"></div><span id="badge-txt">Loading…</span></div>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab on"  onclick="go('ov',this)">📊 Overview</button>
+    <button class="tab" onclick="go('acq',this)">🆕 Acquisition Volume</button>
+    <button class="tab" onclick="go('act',this)">⚡ Activation & Quality</button>
+    <button class="tab" onclick="go('coh',this)">🔄 Cohort Retention</button>
+    <button class="tab" onclick="go('gmv',this)">💰 GMV & Revenue</button>
+    <button class="tab" onclick="go('con',this)">📐 Contribution</button>
+    <button class="tab" onclick="go('dat',this)">🗂 Raw Data</button>
+  </div>
+  <main id="M"></main>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// CSV LOADER & PARSER
+// ─────────────────────────────────────────────────────────────────────────────
+function parseCSV(text){
+  const lines = text.trim().split(/\r?\n/);
+  const headers = lines[0].split(',').map(h=>h.trim());
+  return lines.slice(1).filter(l=>l.trim()).map(line=>{
+    // handle quoted fields
+    const vals=[];let cur='',inQ=false;
+    for(let i=0;i<line.length;i++){
+      if(line[i]==='"'){inQ=!inQ;}
+      else if(line[i]===','&&!inQ){vals.push(cur.trim());cur='';}
+      else cur+=line[i];
+    }
+    vals.push(cur.trim());
+    const row={};
+    headers.forEach((h,i)=>{
+      const v=vals[i]||'';
+      row[h]=isNaN(v)||v===''?v:Number(v);
+    });
+    return row;
+  });
+}
+
+function toQuarter(dateStr){
+  // dateStr like "2025-01-01" or "2025-01"
+  const parts=dateStr.split('-');
+  const y=parseInt(parts[0]),m=parseInt(parts[1]);
+  const q=Math.ceil(m/3);
+  return `Q${q} FY${String(y).slice(2)}`;
+}
+
+function toYM(dateStr){
+  // normalise to YYYY-MM
+  return dateStr.slice(0,7);
+}
+
+function fmtDate(ym){
+  const[y,m]=ym.split('-');
+  return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]+' '+y.slice(2);
+}
+
+async function loadData(){
+  try{
+    const res=await fetch('./data.csv');
+    if(!res.ok) throw new Error(`HTTP ${res.status} — ${res.statusText}`);
+    const text=await res.text();
+    if(!text.trim()) throw new Error('data.csv is empty');
+    return parseCSV(text);
+  } catch(e){
+    showError(e.message);
+    return null;
+  }
+}
+
+function showError(msg){
+  document.getElementById('loader').style.display='none';
+  const es=document.getElementById('error-screen');
+  es.style.display='flex';
+  document.getElementById('err-msg').textContent=msg;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GLOBALS (populated after load)
+// ─────────────────────────────────────────────────────────────────────────────
+let D=[],cohorts=[],actMonths=[],cohortQs=[],activeQs=[],fm=[],trend=[],lk={},totalGMVByMonth={};
+
+function initData(raw){
+  // Normalise date fields to YYYY-MM and add quarter fields
+  D=raw.map(r=>({
+    ...r,
+    cohort: toYM(String(r.cohort_month)),
+    active:  toYM(String(r.active_month)),
+    cohort_q: toQuarter(String(r.cohort_month)),
+    active_q:  toQuarter(String(r.active_month)),
+    new_res:   +r.new_res,
+    retained_res: +r.retained_res,
+    total_res: +r.total_res,
+    new_gmv:   +r.new_res_gmv,
+    retained_gmv: +r.retained_res_gmv,
+    total_gmv: +r.total_res_gmv,
+    new_txns:  +r.new_res_txns,
+    retained_txns: +r.retained_res_txns,
+    total_txns: +r.total_res_txns,
+    transacting: +r.transacting_res,
+    new_transacting: +r.new_transacting_res,
+    retained_transacting: +r.retained_transacting_res,
+  }));
+
+  const sortQ=arr=>arr.sort((a,b)=>{
+    const fy=s=>parseInt(s.slice(-2)),q=s=>parseInt(s[1]);
+    return fy(a)-fy(b)||q(a)-q(b);
+  });
+
+  cohorts    =[...new Set(D.map(r=>r.cohort))].sort();
+  actMonths  =[...new Set(D.map(r=>r.active))].sort();
+  cohortQs   =sortQ([...new Set(D.map(r=>r.cohort_q))]);
+  activeQs   =sortQ([...new Set(D.map(r=>r.active_q))]);
+  fm         =D.filter(r=>r.cohort===r.active);
+  const byA  ={};D.forEach(r=>{byA[r.active]=r;});
+  trend      =actMonths.map(m=>byA[m]);
+  lk         ={};D.forEach(r=>{lk[r.cohort+'|'+r.active]=r;});
+  totalGMVByMonth={};
+  D.forEach(r=>{if(!totalGMVByMonth[r.active]||r.total_gmv>totalGMVByMonth[r.active])totalGMVByMonth[r.active]=r.total_gmv;});
+
+  // Update header metadata
+  const first=cohorts[0],last=cohorts[cohorts.length-1];
+  document.getElementById('hdr-sub').textContent=`Delhi NCR · ${fmtDate(first)} – ${fmtDate(last)} · ${D.length} records`;
+  document.getElementById('badge-txt').textContent=`${cohorts.length} Cohorts · Live`;
+  document.getElementById('last-updated').textContent=`Updated: ${new Date().toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'})}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHART.JS DEFAULTS
+// ─────────────────────────────────────────────────────────────────────────────
+Chart.defaults.color='#64748b';
+Chart.defaults.font.family="'JetBrains Mono',monospace";
+Chart.defaults.font.size=10;
+const C={or:'#f97316',cy:'#22d3ee',vi:'#a78bfa',em:'#34d399',ro:'#fb7185',am:'#fbbf24',bl:'#60a5fa',pk:'#f472b6'};
+let charts={};
+function kc(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};}
+
+function cOpts(isMoney,stacked,isPct){
+  return{responsive:true,maintainAspectRatio:true,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:12,usePointStyle:true}},
+    tooltip:{callbacks:{label:ctx=>{const v=ctx.raw;if(v==null)return null;
+      if(isMoney)return ' ₹'+Number(v).toLocaleString();
+      if(isPct)return ' '+Number(v).toFixed(2)+'%';
+      return ' '+Number(v).toLocaleString();}}}},
+    scales:{
+      x:{grid:{color:'rgba(35,45,66,.7)'},ticks:{maxRotation:45,minRotation:30},stacked:!!stacked},
+      y:{grid:{color:'rgba(35,45,66,.7)'},stacked:!!stacked,ticks:{callback:v=>{
+        if(isMoney)return '₹'+(Math.abs(v)>=1e6?(v/1e6).toFixed(1)+'M':Math.abs(v)>=1e3?(v/1e3).toFixed(0)+'K':v);
+        if(isPct)return v+'%';
+        return Math.abs(v)>=1e3?(v/1e3).toFixed(0)+'K':v;}}}}};
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FORMATTERS
+// ─────────────────────────────────────────────────────────────────────────────
+const fN=n=>n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':String(Math.round(n||0));
+const fC=n=>'₹'+fN(n);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HEATMAP BUILDER
+// ─────────────────────────────────────────────────────────────────────────────
+function mkHM(elId,cList,aList,valueFn,baseHex){
+  const r=parseInt(baseHex.slice(1,3),16),g=parseInt(baseHex.slice(3,5),16),b=parseInt(baseHex.slice(5,7),16);
+  let h='<table class="hmt"><thead><tr><th>↓ Cohort / Active →</th>';
+  aList.forEach(a=>{h+=`<th>${fmtDate(a)}</th>`;});h+='</tr></thead><tbody>';
+  cList.forEach(c=>{
+    h+=`<tr><td class="hml">${fmtDate(c)}</td>`;
+    aList.forEach(a=>{
+      if(a<c){h+=`<td style="background:var(--bg)"></td>`;return;}
+      const v=valueFn(c,a);
+      if(v==null){h+=`<td style="background:var(--s2);color:var(--tm)">—</td>`;return;}
+      const al=Math.max(.1,Math.min(v.intensity,1));
+      const tc=al>.48?'#fff':'#94a3b8';
+      h+=`<td style="background:rgba(${r},${g},${b},${al.toFixed(2)});color:${tc}" title="${v.tip}">${v.label}</td>`;
+    });h+='</tr>';
+  });h+='</tbody></table>';
+  document.getElementById(elId).innerHTML=h;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB ROUTER
+// ─────────────────────────────────────────────────────────────────────────────
+const panels={ov:bOv,acq:bAcq,act:bAct,coh:bCoh,gmv:bGMV,con:bCon,dat:bDat};
+function go(name,btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');kc();panels[name]();
+  setTimeout(()=>Object.values(charts).forEach(c=>{try{c.resize()}catch(e){}}),60);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OVERVIEW
+// ─────────────────────────────────────────────────────────────────────────────
+function bOv(){
+  const last=trend[trend.length-1],prev=trend[trend.length-2];
+  const tNew=fm.reduce((s,r)=>s+r.new_res,0);
+  const tNTx=fm.reduce((s,r)=>s+r.new_transacting,0);
+  const act=(tNTx/tNew*100).toFixed(1);
+  const dRes=last.total_res-prev.total_res;
+  const dGMV=((last.total_gmv-prev.total_gmv)/prev.total_gmv*100).toFixed(1);
+  document.getElementById('M').innerHTML=`
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-l">Total Live Restaurants</div><div class="kpi-v" style="color:var(--a1)">${fN(last.total_res)}</div><div class="kpi-d ${dRes>=0?'up':'dn'}">${dRes>=0?'▲':'▼'} ${Math.abs(dRes)} vs prev month</div></div>
+    <div class="kpi"><div class="kpi-l">Latest Month GMV</div><div class="kpi-v" style="color:var(--a2)">${fC(last.total_gmv)}</div><div class="kpi-d ${parseFloat(dGMV)>=0?'up':'dn'}">${parseFloat(dGMV)>=0?'▲':'▼'} ${Math.abs(dGMV)}% MoM</div></div>
+    <div class="kpi"><div class="kpi-l">Total New Res Acquired</div><div class="kpi-v" style="color:var(--a3)">${tNew}</div><div class="kpi-d">across ${fm.length} cohorts</div></div>
+    <div class="kpi"><div class="kpi-l">Avg M1 Activation Rate</div><div class="kpi-v" style="color:var(--a4)">${act}%</div><div class="kpi-d">new res transacting in M1</div></div>
+    <div class="kpi"><div class="kpi-l">New Res M1 GMV (all-time)</div><div class="kpi-v" style="color:var(--a5)">${fC(fm.reduce((s,r)=>s+r.new_gmv,0))}</div><div class="kpi-d">first-month GMV sum</div></div>
+  </div>
+  <div class="sl">Platform Trajectory</div>
+  <div class="g2">
+    <div class="card"><div class="ch"><div><div class="ct">Total Restaurant Base & Transacting</div><div class="cs">all cohorts combined · monthly</div></div></div><canvas id="c1" height="200"></canvas><div class="caption">Shows how the total restaurant count and the subset that actually ordered grow month over month — the gap reveals dormant restaurants.</div></div>
+    <div class="card"><div class="ch"><div><div class="ct">Total Platform GMV</div><div class="cs">monthly trend across all cohorts</div></div></div><canvas id="c2" height="200"></canvas><div class="caption">Platform-level GMV each month. Spikes and dips flag seasonal patterns or acquisition quality shifts.</div></div>
+  </div>
+  <div class="sl">New Acquisitions Spotlight</div>
+  <div class="g12">
+    <div class="card"><div class="ch"><div><div class="ct">New Restaurant Acquisitions by Month</div><div class="cs">count of new res in each cohort month</div></div></div><canvas id="c3" height="200"></canvas><div class="caption">Raw acquisition volume per month. Peaks and troughs highlight team capacity and seasonality.</div></div>
+    <div class="card"><div class="ch"><div><div class="ct">New Res % of Total Base</div><div class="cs">acquisition as % of total on-platform</div></div></div><canvas id="c4" height="200"></canvas><div class="caption">How much each cohort's new additions move the needle on the total base.</div></div>
+  </div>
+  <div class="sl">Transaction Activity</div>
+  <div class="g2">
+    <div class="card"><div class="ch"><div><div class="ct">New vs Retained Transaction Split</div><div class="cs">stacked monthly transaction volume</div></div></div><canvas id="c5" height="200"></canvas><div class="caption">New-res txns growing = acquisitions are active; retained txns growing = platform stickiness improving.</div></div>
+    <div class="card"><div class="ch"><div><div class="ct">Transacting Rate Trend</div><div class="cs">% of total restaurants that ordered each month</div></div></div><canvas id="c6" height="200"></canvas><div class="caption">Sustained above 50% signals a healthy, ordering-active base; dips warn of dormancy building up.</div></div>
+  </div>`;
+  const lbl=trend.map(r=>fmtDate(r.active));
+  charts.c1=new Chart(document.getElementById('c1'),{type:'line',data:{labels:lbl,datasets:[{label:'Total Res',data:trend.map(r=>r.total_res),borderColor:C.or,backgroundColor:'rgba(249,115,22,.07)',fill:true,tension:.4,pointRadius:3},{label:'Transacting',data:trend.map(r=>r.transacting),borderColor:C.em,tension:.4,pointRadius:3}]},options:cOpts()});
+  charts.c2=new Chart(document.getElementById('c2'),{type:'line',data:{labels:lbl,datasets:[{label:'GMV',data:trend.map(r=>r.total_gmv),borderColor:C.cy,backgroundColor:'rgba(34,211,238,.07)',fill:true,tension:.4,pointRadius:3}]},options:cOpts(true)});
+  const al=fm.map(r=>fmtDate(r.cohort)),avg=Math.round(fm.reduce((s,r)=>s+r.new_res,0)/fm.length);
+  charts.c3=new Chart(document.getElementById('c3'),{type:'bar',data:{labels:al,datasets:[{label:'New Restaurants',data:fm.map(r=>r.new_res),backgroundColor:fm.map(r=>r.new_res>=avg?C.vi+'cc':C.vi+'55'),borderRadius:4}]},options:cOpts()});
+  charts.c4=new Chart(document.getElementById('c4'),{type:'line',data:{labels:al,datasets:[{label:'New Res %',data:fm.map(r=>(r.new_res/r.total_res*100).toFixed(2)),borderColor:C.am,backgroundColor:'rgba(251,191,36,.1)',fill:true,tension:.4,pointRadius:4}]},options:cOpts(false,false,true)});
+  charts.c5=new Chart(document.getElementById('c5'),{type:'bar',data:{labels:lbl,datasets:[{label:'New Res Txns',data:trend.map(r=>r.new_txns),backgroundColor:C.or+'cc',stack:'t'},{label:'Retained Txns',data:trend.map(r=>r.retained_txns),backgroundColor:C.cy+'55',stack:'t'}]},options:cOpts(false,true)});
+  charts.c6=new Chart(document.getElementById('c6'),{type:'line',data:{labels:lbl,datasets:[{label:'Transacting %',data:trend.map(r=>(r.transacting/r.total_res*100).toFixed(1)),borderColor:C.pk,backgroundColor:'rgba(244,114,182,.08)',fill:true,tension:.4,pointRadius:3}]},options:cOpts(false,false,true)});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACQUISITION VOLUME
+// ─────────────────────────────────────────────────────────────────────────────
+function bAcq(){
+  const al=fm.map(r=>fmtDate(r.cohort)),avg=Math.round(fm.reduce((s,r)=>s+r.new_res,0)/fm.length);
+  const best=fm.reduce((a,b)=>a.new_res>b.new_res?a:b),worst=fm.reduce((a,b)=>a.new_res<b.new_res?a:b);
+  const total=fm.reduce((s,r)=>s+r.new_res,0);
+  let run=0;const cum=fm.map(r=>{run+=r.new_res;return run;});
+  const mom=fm.map((r,i)=>i===0?null:((r.new_res-fm[i-1].new_res)/fm[i-1].new_res*100).toFixed(1));
+  const ma3=fm.map((_,i)=>i<2?null:Math.round((fm[i].new_res+fm[i-1].new_res+fm[i-2].new_res)/3));
+  document.getElementById('M').innerHTML=`
+  <div class="ins">
+    <div class="in"><div class="in-t">Peak Month</div><div class="in-v" style="color:var(--a4)">${best.new_res} res</div><div class="in-d">${fmtDate(best.cohort)} — highest single-month acquisition</div></div>
+    <div class="in c2"><div class="in-t">All-Time Total</div><div class="in-v" style="color:var(--a2)">${total}</div><div class="in-d">across ${fm.length} cohort months tracked</div></div>
+    <div class="in c3"><div class="in-t">Monthly Average</div><div class="in-v" style="color:var(--a3)">${avg}</div><div class="in-d">avg new restaurants per month</div></div>
+    <div class="in c5"><div class="in-t">Weakest Month</div><div class="in-v" style="color:var(--a5)">${worst.new_res} res</div><div class="in-d">${fmtDate(worst.cohort)} — opportunity for review</div></div>
+    <div class="in c6"><div class="in-t">Latest Cohort</div><div class="in-v" style="color:var(--a6)">${fm[fm.length-1].new_res}</div><div class="in-d">${fmtDate(fm[fm.length-1].cohort)} · most recent month</div></div>
+    <div class="in c4"><div class="in-t">Cumulative Total</div><div class="in-v" style="color:var(--a4)">${cum[cum.length-1]}</div><div class="in-d">running total of all new sign-ups</div></div>
+  </div>
+  <div class="sl">Volume Trends</div>
+  <div class="g2">
+    <div class="card"><div class="ch"><div><div class="ct">Monthly Acquisitions + 3-Month Rolling Average</div><div class="cs">bars above average highlighted · dashed = rolling 3M avg</div></div></div><canvas id="c1" height="220"></canvas><div class="caption">Orange bars show raw monthly acquisition count. Darker bars exceeded the monthly average. The dashed amber line is the 3-month rolling average — tracks momentum.</div></div>
+    <div class="card"><div class="ch"><div><div class="ct">Cumulative Restaurants Acquired</div><div class="cs">running total since first cohort</div></div></div><canvas id="c2" height="220"></canvas><div class="caption">Running sum of all new restaurants signed up. Slope of the curve reveals acceleration or deceleration in acquisition pace over time.</div></div>
+  </div>
+  <div class="g2">
+    <div class="card"><div class="ch"><div><div class="ct">Month-over-Month Growth Rate</div><div class="cs">% change in new restaurant count vs prior month</div></div></div><canvas id="c3" height="200"></canvas><div class="caption">Green bars = acquisition accelerating vs prior month; red bars = contraction. High volatility suggests inconsistent pipeline health.</div></div>
+    <div class="card"><div class="ch"><div><div class="ct">First-Month GMV from New Restaurants</div><div class="cs">₹ GMV generated in M1 by newly onboarded restaurants</div></div></div><canvas id="c4" height="200"></canvas><div class="caption">Not all acquisitions are equal — this shows how much GMV each cohort delivered in their very first month on-platform.</div></div>
+  </div>`;
+  charts.c1=new Chart(document.getElementById('c1'),{type:'bar',data:{labels:al,datasets:[{type:'bar',label:'New Res',data:fm.map(r=>r.new_res),backgroundColor:fm.map(r=>r.new_res>=avg?C.vi+'cc':C.vi+'44'),borderRadius:4},{type:'line',label:'3M Avg',data:ma3,borderColor:C.am,borderDash:[4,3],pointRadius:0,tension:.4}]},options:cOpts()});
+  charts.c2=new Chart(document.getElementById('c2'),{type:'line',data:{labels:al,datasets:[{label:'Cumulative',data:cum,borderColor:C.cy,backgroundColor:'rgba(34,211,238,.1)',fill:true,tension:.4,pointRadius:3}]},options:cOpts()});
+  charts.c3=new Chart(document.getElementById('c3'),{type:'bar',data:{labels:al.slice(1),datasets:[{label:'MoM %',data:mom.slice(1),backgroundColor:mom.slice(1).map(v=>parseFloat(v)>=0?C.em+'99':C.ro+'99'),borderRadius:4}]},options:cOpts(false,false,true)});
+  charts.c4=new Chart(document.getElementById('c4'),{type:'bar',data:{labels:al,datasets:[{label:'New Res M1 GMV',data:fm.map(r=>r.new_gmv),backgroundColor:C.cy+'99',borderRadius:4}]},options:cOpts(true)});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTIVATION
+// ─────────────────────────────────────────────────────────────────────────────
+function bAct(){
+  const al=fm.map(r=>fmtDate(r.cohort));
+  const actR=fm.map(r=>(r.new_transacting/r.new_res*100).toFixed(1));
+  const avgA=(actR.reduce((s,v)=>s+parseFloat(v),0)/actR.length).toFixed(1);
+  const dark=fm.map(r=>r.new_res-r.new_transacting);
+  const gPTx=fm.map(r=>r.new_transacting?Math.round(r.new_gmv/r.new_transacting):0);
+  const tPTx=fm.map(r=>r.new_transacting?(r.new_txns/r.new_transacting).toFixed(1):0);
+  const bi=actR.indexOf(String(Math.max(...actR.map(Number)))),wi=actR.indexOf(String(Math.min(...actR.map(Number))));
+  const mat=cohorts.map(c=>{const m1=lk[c+'|'+c];const ams=actMonths.filter(a=>a>=c);const a3=ams[2]?lk[c+'|'+ams[2]]:null;if(!m1||!a3||!m1.new_transacting)return null;return{cohort:c,m1g:Math.round(m1.new_gmv/m1.new_transacting),m3g:Math.round(a3.new_gmv/a3.new_transacting),lift:((a3.new_gmv/a3.new_transacting)/(m1.new_gmv/m1.new_transacting)-1)*100};}).filter(Boolean);
+  document.getElementById('M').innerHTML=`
+  <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi"><div class="kpi-l">Avg Activation Rate</div><div class="kpi-v" style="color:var(--a4)">${avgA}%</div><div class="kpi-d">% new res placing ≥1 order in M1</div></div>
+    <div class="kpi"><div class="kpi-l">Best Activation</div><div class="kpi-v" style="color:var(--a2)">${actR[bi]}%</div><div class="kpi-d">${fmtDate(fm[bi].cohort)}</div></div>
+    <div class="kpi"><div class="kpi-l">Weakest Activation</div><div class="kpi-v" style="color:var(--a5)">${actR[wi]}%</div><div class="kpi-d">${fmtDate(fm[wi].cohort)}</div></div>
+    <div class="kpi"><div class="kpi-l">Avg GMV / Activated Res</div><div class="kpi-v" style="color:var(--a3)">₹${fN(gPTx.reduce((s,v)=>s+v,0)/gPTx.length)}</div><div class="kpi-d">across all M1 cohorts</div></div>
+  </div>
+  <div class="sl">Activation Depth</div>
+  <div class="g2">
+    <div class="card"><div class="ch"><div><div class="ct">M1 Activation Rate by Cohort</div><div class="cs">% of new res placing ≥1 order in their first month</div></div></div><canvas id="c1" height="220"></canvas><div class="caption">Green bars exceeded the average activation rate; red fell short. Low activation = restaurants were signed but not ordering — a pipeline leak at onboarding.</div></div>
+    <div class="card"><div class="ch"><div><div class="ct">Activated vs Dark Restaurants (M1)</div><div class="cs">transacting (green) vs 0-order (red) per cohort</div></div></div><canvas id="c2" height="220"></canvas><div class="caption">Dark restaurants are a direct revenue loss. Track how this ratio improves over time to measure onboarding effectiveness.</div></div>
+  </div>
+  <div class="g2">
+    <div class="card"><div class="ch"><div><div class="ct">GMV per Activated New Res (M1)</div><div class="cs">₹ GMV per transacting restaurant in their first month</div></div></div><canvas id="c3" height="200"></canvas><div class="caption">Revenue quality of activated cohorts. Falling = lower-value restaurants being signed up or activation happening too late in the month.</div></div>
+    <div class="card"><div class="ch"><div><div class="ct">Orders per Activated New Res (M1)</div><div class="cs">transaction frequency of activated restaurants in M1</div></div></div><canvas id="c4" height="200"></canvas><div class="caption">How many times an activated new restaurant ordered in its first month. Higher = faster habit formation; lower = one-and-done risk.</div></div>
+  </div>
+  <div class="sl">Cohort Maturation: M1 → M3</div>
+  <div class="g2">
+    <div class="card"><div class="ch"><div><div class="ct">GMV/Activated Res: M1 vs M3</div><div class="cs">does GMV contribution grow after 3 months?</div></div></div><canvas id="c5" height="200"></canvas><div class="caption">Paired bars for M1 vs M3 GMV per activated restaurant. If M3 significantly exceeds M1, the cohort is ramping up — a good sign of product-market fit.</div></div>
+    <div class="card"><div class="ch"><div><div class="ct">GMV Lift: M1 → M3 (%)</div><div class="cs">% uplift in GMV per activated res from M1 to M3</div></div></div><canvas id="c6" height="200"></canvas><div class="caption">Positive bars = restaurants are ordering more at month 3 than month 1. This is the clearest signal of whether your acquisition converts to long-term GMV growth.</div></div>
+  </div>`;
+  charts.c1=new Chart(document.getElementById('c1'),{type:'bar',data:{labels:al,datasets:[{label:'Activation %',data:actR,backgroundColor:actR.map(v=>parseFloat(v)>=parseFloat(avgA)?C.em+'cc':C.ro+'99'),borderRadius:4}]},options:cOpts(false,false,true)});
+  charts.c2=new Chart(document.getElementById('c2'),{type:'bar',data:{labels:al,datasets:[{label:'Activated',data:fm.map(r=>r.new_transacting),backgroundColor:C.em+'cc',stack:'s'},{label:'Dark (0 orders)',data:dark,backgroundColor:C.ro+'88',stack:'s'}]},options:cOpts(false,true)});
+  charts.c3=new Chart(document.getElementById('c3'),{type:'line',data:{labels:al,datasets:[{label:'₹ GMV/Tx Res',data:gPTx,borderColor:C.am,backgroundColor:'rgba(251,191,36,.1)',fill:true,tension:.4,pointRadius:4}]},options:cOpts(true)});
+  charts.c4=new Chart(document.getElementById('c4'),{type:'bar',data:{labels:al,datasets:[{label:'Txns/Tx Res',data:tPTx,backgroundColor:C.vi+'99',borderRadius:4}]},options:cOpts()});
+  const ml=mat.map(m=>fmtDate(m.cohort));
+  charts.c5=new Chart(document.getElementById('c5'),{type:'bar',data:{labels:ml,datasets:[{label:'M1',data:mat.map(m=>m.m1g),backgroundColor:C.bl+'88'},{label:'M3',data:mat.map(m=>m.m3g),backgroundColor:C.cy+'cc'}]},options:cOpts(true)});
+  charts.c6=new Chart(document.getElementById('c6'),{type:'bar',data:{labels:ml,datasets:[{label:'Lift %',data:mat.map(m=>m.lift.toFixed(1)),backgroundColor:mat.map(m=>m.lift>=0?C.em+'cc':C.ro+'99'),borderRadius:4}]},options:cOpts(false,false,true)});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COHORT RETENTION
+// ─────────────────────────────────────────────────────────────────────────────
+function bCoh(){
+  document.getElementById('M').innerHTML=`
+  <div class="sl">Retention Heatmap</div>
+  <div class="card full"><div class="ch"><div><div class="ct">Cohort Retention Matrix — New Restaurant Count</div><div class="cs">diagonal = M1 · cells = % of original cohort new_res still active</div></div><div class="cbadge">% of M1</div></div><div class="hmw" id="h1"></div><div class="caption">Each row = one acquisition cohort. Columns = subsequent active months. Cell = % of original new restaurants still active. Darker = stronger retention.</div></div>
+  <div class="g2">
+    <div class="card"><div class="ch"><div><div class="ct">Retention Curves by Cohort</div><div class="cs">% of M1 cohort new_res remaining by months since onboarding</div></div></div><canvas id="c1" height="240"></canvas><div class="caption">Each line = one cohort. X-axis = months after onboarding. Steeper drop = faster churn. Flatter = better long-term retention.</div></div>
+    <div class="card"><div class="ch"><div><div class="ct">GMV Cohort Heatmap</div><div class="cs">new-res GMV by cohort × active month</div></div></div><div class="hmw" id="h2"></div><div class="caption">Colour intensity = GMV from that cohort's new restaurants relative to their M1 GMV baseline. Brighter = growing GMV contribution.</div></div>
+  </div>
+  <div class="card full"><div class="ch"><div><div class="ct">New-Res GMV by Cohort — Months Post-Acquisition</div><div class="cs">each line = one cohort · x-axis = months since joining</div></div></div><canvas id="c2" height="200"></canvas><div class="caption">Shows how GMV from each acquisition cohort evolves over time. Cohorts that ramp up quickly are highest quality.</div></div>`;
+  mkHM('h1',cohorts,actMonths,(c,a)=>{const r=lk[c+'|'+a],b=lk[c+'|'+c];if(!r||!b)return null;const p=r.new_res/b.new_res;return{intensity:p,label:(p*100).toFixed(0)+'%',tip:`${fmtDate(c)}→${fmtDate(a)}: ${r.new_res} res (${(p*100).toFixed(1)}%)`};},C.or);
+  mkHM('h2',cohorts,actMonths,(c,a)=>{const r=lk[c+'|'+a],b=lk[c+'|'+c];if(!r||!b||!b.new_gmv)return null;const p=Math.min(r.new_gmv/b.new_gmv,4)/4;return{intensity:p,label:fC(r.new_gmv),tip:`${fmtDate(c)}→${fmtDate(a)}: ${fC(r.new_gmv)}`};},C.cy);
+  const clrs=Object.values(C);const mxL=Math.max(...cohorts.map(c=>actMonths.filter(a=>a>=c).length));
+  const retLbl=Array.from({length:mxL},(_,i)=>'M'+(i+1));
+  charts.c1=new Chart(document.getElementById('c1'),{type:'line',data:{labels:retLbl,datasets:cohorts.map((c,i)=>{const b=lk[c+'|'+c];const pts=actMonths.filter(a=>a>=c).map(a=>{const r=lk[c+'|'+a];return r&&b?(r.new_res/b.new_res*100).toFixed(1):null;});return{label:fmtDate(c),data:pts,borderColor:clrs[i%clrs.length],tension:.4,pointRadius:2,fill:false};})},options:cOpts(false,false,true)});
+  charts.c2=new Chart(document.getElementById('c2'),{type:'line',data:{labels:retLbl,datasets:cohorts.map((c,i)=>{const pts=actMonths.filter(a=>a>=c).map(a=>{const r=lk[c+'|'+a];return r?Math.round(r.new_gmv):null;});return{label:fmtDate(c),data:pts,borderColor:clrs[i%clrs.length],tension:.4,pointRadius:2,fill:false};})},options:cOpts(true)});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GMV & REVENUE
+// ─────────────────────────────────────────────────────────────────────────────
+function bGMV(){
+  const lbl=trend.map(r=>fmtDate(r.active));
+  const gPTR=trend.map(r=>r.transacting?Math.round(r.total_gmv/r.transacting):0);
+  const gPTxn=trend.map(r=>r.total_txns?Math.round(r.total_gmv/r.total_txns):0);
+  const newPct=trend.map(r=>r.total_gmv?(r.new_gmv/r.total_gmv*100).toFixed(2):0);
+  const last=trend[trend.length-1];
+  // Compute quarters dynamically
+  const qMap={};
+  trend.forEach(r=>{const q=r.active_q;if(!qMap[q])qMap[q]=0;qMap[q]+=r.total_gmv;});
+  const Qs=activeQs.filter(q=>qMap[q]).map(q=>({q,v:qMap[q]}));
+  document.getElementById('M').innerHTML=`
+  <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi"><div class="kpi-l">Latest Month GMV</div><div class="kpi-v" style="color:var(--a1)">${fC(last.total_gmv)}</div><div class="kpi-d">${fmtDate(last.active)}</div></div>
+    <div class="kpi"><div class="kpi-l">GMV / Transacting Res</div><div class="kpi-v" style="color:var(--a2)">₹${fN(gPTR[gPTR.length-1])}</div><div class="kpi-d">latest month</div></div>
+    <div class="kpi"><div class="kpi-l">Avg Transaction Value</div><div class="kpi-v" style="color:var(--a3)">₹${fN(gPTxn[gPTxn.length-1])}</div><div class="kpi-d">GMV per order</div></div>
+    <div class="kpi"><div class="kpi-l">New Res GMV Share</div><div class="kpi-v" style="color:var(--a4)">${newPct[newPct.length-1]}%</div><div class="kpi-d">of total platform GMV</div></div>
+  </div>
+  <div class="sl">GMV Composition</div>
+  <div class="g2">
+    <div class="card"><div class="ch"><div><div class="ct">GMV: New vs Retained Restaurant Contribution</div><div class="cs">stacked by active month</div></div></div><canvas id="c1" height="220"></canvas><div class="caption">Orange = GMV from newly acquired restaurants; teal = from retained. The orange slice growing means acquisitions are driving incremental GMV at scale.</div></div>
+    <div class="card"><div class="ch"><div><div class="ct">Quarterly Platform GMV</div><div class="cs">aggregated quarterly totals</div></div></div><canvas id="c2" height="220"></canvas><div class="caption">Quarterly roll-up of total GMV. Shows the step-change in platform scale and helps benchmark against targets.</div></div>
+  </div>
+  <div class="g3">
+    <div class="card"><div class="ch"><div><div class="ct">GMV / Transacting Restaurant</div><div class="cs">spending intensity of active restaurants</div></div></div><canvas id="c3" height="200"></canvas><div class="caption">Rising trend = restaurant orders are growing in size or frequency — a key health metric.</div></div>
+    <div class="card"><div class="ch"><div><div class="ct">Average Transaction Value (₹)</div><div class="cs">GMV per order placed on platform</div></div></div><canvas id="c4" height="200"></canvas><div class="caption">Rising ATV = higher-value orders. Falling may indicate mix shift toward smaller restaurants.</div></div>
+    <div class="card"><div class="ch"><div><div class="ct">New Res GMV Contribution %</div><div class="cs">share of platform GMV from new restaurants</div></div></div><canvas id="c5" height="200"></canvas><div class="caption">The fraction of total monthly GMV attributable to newly acquired cohorts.</div></div>
+  </div>`;
+  charts.c1=new Chart(document.getElementById('c1'),{type:'bar',data:{labels:lbl,datasets:[{label:'Retained GMV',data:trend.map(r=>r.retained_gmv),backgroundColor:C.cy+'77',stack:'g'},{label:'New Res GMV',data:trend.map(r=>r.new_gmv),backgroundColor:C.or+'cc',stack:'g'}]},options:cOpts(true,true)});
+  charts.c2=new Chart(document.getElementById('c2'),{type:'bar',data:{labels:Qs.map(q=>q.q),datasets:[{label:'Quarterly GMV',data:Qs.map(q=>q.v),backgroundColor:[C.vi,C.cy,C.or,C.em,C.am,C.bl].map(c=>c+'88'),borderRadius:6}]},options:cOpts(true)});
+  charts.c3=new Chart(document.getElementById('c3'),{type:'line',data:{labels:lbl,datasets:[{label:'GMV/Tx Res',data:gPTR,borderColor:C.am,tension:.4,pointRadius:3}]},options:cOpts(true)});
+  charts.c4=new Chart(document.getElementById('c4'),{type:'line',data:{labels:lbl,datasets:[{label:'Avg Txn Value',data:gPTxn,borderColor:C.vi,tension:.4,pointRadius:3}]},options:cOpts(true)});
+  charts.c5=new Chart(document.getElementById('c5'),{type:'bar',data:{labels:lbl,datasets:[{label:'New GMV %',data:newPct,backgroundColor:C.or+'99',borderRadius:3}]},options:cOpts(false,false,true)});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTRIBUTION
+// ─────────────────────────────────────────────────────────────────────────────
+function computeQScorecard(){
+  const result={};
+  cohortQs.forEach(q=>{
+    const rows=D.filter(r=>r.cohort_q===q&&r.active_q===q);
+    const months=[...new Set(rows.map(r=>r.active))];
+    const sumNew=rows.reduce((s,r)=>s+r.new_gmv,0);
+    const sumTotal=months.reduce((s,m)=>s+(totalGMVByMonth[m]||0),0);
+    const newRes=D.filter(r=>r.cohort_q===q&&r.cohort===r.active).reduce((s,r)=>s+r.new_res,0);
+    result[q]={sumNew,sumTotal,pct:sumTotal?sumNew/sumTotal*100:0,newRes};
+  });
+  return result;
+}
+function computeQMatrix(){
+  const matrix={};
+  cohortQs.forEach(cq=>{
+    matrix[cq]={};
+    activeQs.forEach(aq=>{
+      const rows=D.filter(r=>r.cohort_q===cq&&r.active_q===aq);
+      if(!rows.length){matrix[cq][aq]=null;return;}
+      const months=[...new Set(rows.map(r=>r.active))];
+      const sumNew=rows.reduce((s,r)=>s+r.new_gmv,0);
+      const sumTotal=months.reduce((s,m)=>s+(totalGMVByMonth[m]||0),0);
+      matrix[cq][aq]=sumTotal?sumNew/sumTotal*100:0;
+    });
+  });
+  return matrix;
+}
+
+function bCon(){
+  const sc=computeQScorecard();
+  const qKeys=cohortQs.filter(q=>sc[q]&&sc[q].sumTotal>0);
+  document.getElementById('M').innerHTML=`
+  <div class="sl">New Res GMV Contribution — Quarter Scorecard</div>
+  <div class="card full" style="border-color:var(--a1)">
+    <div class="ch"><div><div class="ct" style="color:var(--a1)">📐 Same-Quarter Contribution %</div><div class="cs">new res GMV of cohorts onboarded IN quarter X ÷ total platform GMV in quarter X</div></div><div class="cbadge">the metric you're looking for</div></div>
+    <div style="display:grid;grid-template-columns:repeat(${Math.min(qKeys.length,6)},1fr);gap:12px;margin-bottom:14px">
+      ${qKeys.map(q=>{const d=sc[q];return`<div style="background:var(--s2);border:1px solid var(--bd);border-radius:9px;padding:14px;text-align:center">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--tm);margin-bottom:6px">${q}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:${d.pct>2?'var(--a4)':'var(--a6)'}">${d.pct.toFixed(2)}%</div>
+        <div style="font-size:10px;color:var(--tm);margin-top:4px">${fC(d.sumNew)} of ${fC(d.sumTotal)}</div>
+        <div style="font-size:10px;color:var(--tm)">${d.newRes} new res onboarded</div>
+      </div>`;}).join('')}
+    </div>
+    <canvas id="chSc" height="90"></canvas>
+    <div class="caption">Each card: % of that quarter's total platform GMV generated by restaurants newly onboarded in the same quarter. JFM 2026 = 2.15% means newly acquired restaurants in Jan–Mar 2026 drove ~2.15% of all GMV in that period.</div>
+  </div>
+  <div class="sl">Quarter × Quarter Contribution Matrix</div>
+  <div class="card full">
+    <div class="ch"><div><div class="ct">New Res GMV % — Cohort Quarter (rows) × Active Quarter (cols)</div><div class="cs">diagonal (orange) = same-quarter scorecard · off-diagonal = legacy cohort contribution</div></div><div class="cbadge">% of active-quarter GMV</div></div>
+    <div class="hmw" id="hmqq"></div>
+    <div class="caption">Diagonal cells = the scorecard metric above. Off-diagonal cells show how earlier cohorts' new restaurants continue contributing GMV in later quarters — a direct measure of long-term acquisition value.</div>
+  </div>
+  <div class="sl">Chart 1 — Cohort Quarter × Active Quarter</div>
+  <div class="card full">
+    <div class="ch"><div><div class="ct">New Res GMV of Selected Cohort Quarter → % of Total GMV per Active Quarter</div><div class="cs">pick a cohort quarter to see its GMV contribution % across all active quarters</div></div></div>
+    <div class="ctrl-row">
+      <label>Cohort Quarter</label>
+      <select id="cq1" onchange="renderCon1()">
+        ${cohortQs.map(q=>`<option value="${q}">${q}</option>`).join('')}
+      </select>
+      <div class="sep"></div>
+      <label>Active Quarter Filter</label>
+      <select id="aq1" onchange="renderCon1()">
+        <option value="ALL">All Active Quarters</option>
+        ${activeQs.map(q=>`<option value="${q}">${q}</option>`).join('')}
+      </select>
+    </div>
+    <canvas id="ch1" height="130"></canvas>
+    <div class="caption">The bar where cohort Q = active Q is the same-quarter contribution (scorecard figure). Bars to the right show how that cohort's GMV contribution persists in later quarters.</div>
+  </div>
+  <div class="sl">Chart 2 — Cohort Quarter × Active Month</div>
+  <div class="card full">
+    <div class="ch"><div><div class="ct">New Res GMV of Cohort Quarter → % of Total GMV per Active Month</div><div class="cs">select cohort quarters to compare their monthly contribution trajectory</div></div></div>
+    <div class="ctrl-row">
+      <label>Cohort Quarter(s)</label>
+      <select id="cq2" multiple size="4" onchange="renderCon2()" style="height:auto;padding:4px">
+        ${cohortQs.map((q,i)=>`<option value="${q}" ${i<3?'selected':''}>${q}</option>`).join('')}
+      </select>
+      <div class="sep"></div>
+      <label style="font-size:10px;color:var(--tm)">Ctrl/Cmd = multi-select</label>
+    </div>
+    <canvas id="ch2" height="140"></canvas>
+    <div class="caption">Each line = one cohort quarter. The peak of each line is the same-quarter contribution %. After that, GMV from these restaurants gets reclassified as "retained" so the line represents only new_res_gmv persisting over time.</div>
+  </div>
+  <div class="sl">GMV Contribution Heatmap — Cohort Quarter × Active Month</div>
+  <div class="card full">
+    <div class="ch"><div><div class="ct">New Res GMV % — Cohort Quarter × Active Month</div><div class="cs">each cell = % of that active month's total GMV from that cohort quarter's new restaurants</div></div><div class="cbadge">% of monthly GMV</div></div>
+    <div class="hmw" id="hmcon"></div>
+    <div class="caption">Waterfall-style heatmap. Read down a column to see how all cohort quarters contributed to a given month's GMV. Read across a row to see a cohort quarter's contribution evolving — typically peaks in M2–M3 then fades as restaurants become "retained".</div>
+  </div>
+  <div class="sl">Total New Res GMV Contribution % — All Cohorts Stacked</div>
+  <div class="card full">
+    <div class="ch"><div><div class="ct">Combined New Res GMV % of Platform — Monthly</div><div class="cs">all cohort quarters stacked</div></div></div>
+    <div class="ctrl-row">
+      <label>View</label>
+      <select id="conView" onchange="renderConStack()">
+        <option value="stacked">Stacked bars</option>
+        <option value="line">Individual lines</option>
+      </select>
+    </div>
+    <canvas id="ch3" height="160"></canvas>
+    <div class="caption">Stacked bars show the total % of each month's GMV from new restaurants across ALL cohort quarters combined — a rising trend means acquisitions are increasingly driving platform GMV.</div>
+  </div>`;
+
+  const scVals=qKeys.map(q=>sc[q].pct.toFixed(2));
+  charts.chSc=new Chart(document.getElementById('chSc'),{type:'bar',data:{labels:qKeys,datasets:[{label:'Same-Quarter Contribution %',data:scVals,backgroundColor:scVals.map(v=>parseFloat(v)>2?C.em+'cc':C.am+'99'),borderRadius:5}]},options:{...cOpts(false,false,true),plugins:{...cOpts(false,false,true).plugins,legend:{display:false}}}});
+  buildQQMatrix();
+  renderCon1();renderCon2();renderConStack();buildConHM();
+}
+
+function buildQQMatrix(){
+  const matrix=computeQMatrix();
+  let maxV=0;
+  cohortQs.forEach(cq=>activeQs.forEach(aq=>{if(matrix[cq][aq]>maxV)maxV=matrix[cq][aq];}));
+  const [r,g,b]=[C.em].map(h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)])[0];
+  const [ro,go,bo]=[parseInt(C.or.slice(1,3),16),parseInt(C.or.slice(3,5),16),parseInt(C.or.slice(5,7),16)];
+  let h=`<table class="hmt"><thead><tr><th>Cohort Q ↓ / Active Q →</th>`;
+  activeQs.forEach(aq=>{h+=`<th>${aq}</th>`;});h+='</tr></thead><tbody>';
+  cohortQs.forEach(cq=>{
+    h+=`<tr><td class="hml">${cq}</td>`;
+    activeQs.forEach(aq=>{
+      const v=matrix[cq][aq],isDiag=cq===aq;
+      if(v===null){h+=`<td style="background:var(--bg)"></td>`;return;}
+      const al=Math.max(.1,Math.min(v/maxV,1));
+      const tc=al>.45?'#fff':'#94a3b8';
+      const cr=isDiag?ro:r,cg=isDiag?go:g,cb=isDiag?bo:b;
+      h+=`<td style="background:rgba(${cr},${cg},${cb},${al.toFixed(2)});color:${tc};${isDiag?'outline:2px solid rgba(249,115,22,.7);':''}font-weight:${isDiag?700:400}" title="${cq} → ${aq}: ${v.toFixed(2)}%">${v.toFixed(2)}%</td>`;
+    });h+='</tr>';
+  });
+  document.getElementById('hmqq').innerHTML=h+'</tbody></table>';
+}
+
+function renderCon1(){
+  const cq=document.getElementById('cq1').value;
+  const aqF=document.getElementById('aq1').value;
+  const qs=aqF==='ALL'?activeQs:[aqF];
+  const labels=[],vals=[];
+  qs.forEach(aq=>{
+    const rows=D.filter(r=>r.cohort_q===cq&&r.active_q===aq);
+    if(!rows.length)return;
+    const months=[...new Set(rows.map(r=>r.active))];
+    const sN=rows.reduce((s,r)=>s+r.new_gmv,0);
+    const sT=months.reduce((s,m)=>s+(totalGMVByMonth[m]||0),0);
+    labels.push(aq);vals.push(sT?(sN/sT*100).toFixed(2):0);
+  });
+  if(charts.ch1)charts.ch1.destroy();
+  const isDiag=labels.map(aq=>aq===cq);
+  charts.ch1=new Chart(document.getElementById('ch1'),{type:'bar',data:{labels,datasets:[{label:`${cq} contribution %`,data:vals,backgroundColor:isDiag.map((d,i)=>d?C.or+'ee':parseFloat(vals[i])>3?C.em+'cc':C.cy+'88'),borderWidth:isDiag.map(d=>d?2:0),borderColor:C.or,borderRadius:5}]},options:{...cOpts(false,false,true),plugins:{...cOpts(false,false,true).plugins,tooltip:{callbacks:{label:ctx=>{const i=ctx.dataIndex;return ` ${vals[i]}%${isDiag[i]?' ← same-quarter scorecard':''}`;}}}}}});
+}
+
+function renderCon2(){
+  const sel=[...document.getElementById('cq2').selectedOptions].map(o=>o.value);
+  const clrs=[C.or,C.cy,C.vi,C.em,C.ro,C.am,C.bl,C.pk];
+  const datasets=sel.map((cq,i)=>{
+    const vals=actMonths.map(m=>{const sN=D.filter(r=>r.active===m&&r.cohort_q===cq).reduce((s,r)=>s+r.new_gmv,0);const tot=totalGMVByMonth[m]||1;return(sN/tot*100).toFixed(2);});
+    return{label:cq,data:vals,borderColor:clrs[i%clrs.length],fill:false,tension:.4,pointRadius:3};
+  });
+  if(charts.ch2)charts.ch2.destroy();
+  charts.ch2=new Chart(document.getElementById('ch2'),{type:'line',data:{labels:actMonths.map(m=>fmtDate(m)),datasets},options:cOpts(false,false,true)});
+}
+
+function renderConStack(){
+  const view=document.getElementById('conView').value;
+  const clrs=[C.or,C.cy,C.vi,C.em,C.ro,C.am,C.bl,C.pk];
+  const lbl=actMonths.map(m=>fmtDate(m));
+  const datasets=cohortQs.map((cq,i)=>{
+    const vals=actMonths.map(m=>{const sN=D.filter(r=>r.active===m&&r.cohort_q===cq).reduce((s,r)=>s+r.new_gmv,0);const tot=totalGMVByMonth[m]||1;return(sN/tot*100).toFixed(2);});
+    return view==='stacked'?{label:cq,data:vals,backgroundColor:clrs[i%clrs.length]+'99',stack:'s'}:{label:cq,data:vals,borderColor:clrs[i%clrs.length],tension:.4,pointRadius:2,fill:false,type:'line'};
+  });
+  if(charts.ch3)charts.ch3.destroy();
+  charts.ch3=new Chart(document.getElementById('ch3'),{type:view==='stacked'?'bar':'line',data:{labels:lbl,datasets},options:cOpts(false,view==='stacked',true)});
+}
+
+function buildConHM(){
+  const r=parseInt(C.or.slice(1,3),16),g=parseInt(C.or.slice(3,5),16),b=parseInt(C.or.slice(5,7),16);
+  let maxV=0;const grid={};
+  cohortQs.forEach(cq=>{grid[cq]={};actMonths.forEach(m=>{const sN=D.filter(x=>x.active===m&&x.cohort_q===cq).reduce((s,x)=>s+x.new_gmv,0);const tot=totalGMVByMonth[m]||1;const pct=sN/tot*100;grid[cq][m]=pct;if(pct>maxV)maxV=pct;});});
+  let h='<table class="hmt"><thead><tr><th>Cohort Q ↓ / Active Month →</th>';
+  actMonths.forEach(m=>{h+=`<th>${fmtDate(m)}</th>`;});h+='</tr></thead><tbody>';
+  cohortQs.forEach(cq=>{
+    h+=`<tr><td class="hml">${cq}</td>`;
+    actMonths.forEach(m=>{
+      const pct=grid[cq][m];
+      if(pct===0){h+=`<td style="background:var(--s2);color:var(--tm)">0%</td>`;return;}
+      const al=Math.max(.08,Math.min(pct/maxV,1));
+      const tc=al>.5?'#fff':'#94a3b8';
+      h+=`<td style="background:rgba(${r},${g},${b},${al.toFixed(2)});color:${tc}" title="${cq} in ${fmtDate(m)}: ${pct.toFixed(2)}%">${pct.toFixed(1)}%</td>`;
+    });h+='</tr>';
+  });
+  document.getElementById('hmcon').innerHTML=h+'</tbody></table>';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RAW DATA
+// ─────────────────────────────────────────────────────────────────────────────
+function bDat(){
+  document.getElementById('M').innerHTML=`
+  <div class="card"><div class="ch"><div><div class="ct">Complete Cohort Dataset</div><div class="cs">${D.length} records · all cohorts × active months</div></div><div class="cbadge">${D.length} rows</div></div>
+  <div class="tw"><table class="dt"><thead><tr>
+    <th>Cohort</th><th>Active</th><th>Cohort Q</th><th>Active Q</th>
+    <th>New Res</th><th>Retained</th><th>Total Res</th>
+    <th>New GMV</th><th>Total GMV</th><th>New Txns</th><th>Total Txns</th>
+    <th>Transacting</th><th>New Tx</th><th>Act%</th><th>New GMV%</th>
+  </tr></thead><tbody>
+  ${[...D].reverse().map(r=>{
+    const act=r.new_transacting/r.new_res*100,gmvPct=r.new_gmv/r.total_gmv*100;
+    return`<tr>
+      <td>${fmtDate(r.cohort)}</td><td>${fmtDate(r.active)}</td>
+      <td>${r.cohort_q}</td><td>${r.active_q}</td>
+      <td class="r g">${r.new_res}</td>
+      <td class="r">${r.retained_res.toLocaleString()}</td>
+      <td class="r">${r.total_res.toLocaleString()}</td>
+      <td class="r">${fC(r.new_gmv)}</td>
+      <td class="r">${fC(r.total_gmv)}</td>
+      <td class="r">${r.new_txns.toLocaleString()}</td>
+      <td class="r">${r.total_txns.toLocaleString()}</td>
+      <td class="r">${r.transacting.toLocaleString()}</td>
+      <td class="r">${r.new_transacting}</td>
+      <td class="r ${act>=50?'g':'rd'}">${act.toFixed(1)}%</td>
+      <td class="r">${gmvPct.toFixed(2)}%</td>
+    </tr>`;
+  }).join('')}
+  </tbody></table></div></div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BOOTSTRAP
+// ─────────────────────────────────────────────────────────────────────────────
+(async()=>{
+  const raw=await loadData();
+  if(!raw)return;
+  initData(raw);
+  document.getElementById('loader').style.display='none';
+  document.getElementById('app').style.display='block';
+  bOv();
+})();
+</script>
+</body>
+</html>
