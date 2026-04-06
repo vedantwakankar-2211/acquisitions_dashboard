@@ -169,37 +169,74 @@ table.dt td{padding:8px 11px}.dt td.r{text-align:right}.dt td.g{color:var(--a4);
 // CSV LOADER & PARSER
 // ─────────────────────────────────────────────────────────────────────────────
 function parseCSV(text){
+  // Strip UTF-8 BOM (Excel/Sheets exports often include this)
+  text = text.replace(/^\uFEFF/,'');
   const lines = text.trim().split(/\r?\n/);
-  const headers = lines[0].split(',').map(h=>h.trim());
+  const headers = lines[0].split(',').map(h=>h.trim().replace(/\r/g,''));
+
   return lines.slice(1).filter(l=>l.trim()).map(line=>{
-    // handle quoted fields
+    // Respect quoted fields (numbers like "3,610" stay together)
     const vals=[];let cur='',inQ=false;
     for(let i=0;i<line.length;i++){
       if(line[i]==='"'){inQ=!inQ;}
       else if(line[i]===','&&!inQ){vals.push(cur.trim());cur='';}
       else cur+=line[i];
     }
-    vals.push(cur.trim());
+    vals.push(cur.trim().replace(/\r/g,''));
+
     const row={};
     headers.forEach((h,i)=>{
-      const v=vals[i]||'';
-      row[h]=isNaN(v)||v===''?v:Number(v);
+      const v=(vals[i]||'').trim().replace(/^"|"$/g,''); // strip surrounding quotes
+      if(isDateVal(v)){
+        row[h]=v; // keep raw date string — toYM() will parse it
+      } else {
+        const n=parseFloat(v.replace(/,/g,'')); // strip commas from "3,610"
+        row[h]=isNaN(n)?v:n;
+      }
     });
     return row;
   });
 }
 
-function toQuarter(dateStr){
-  // dateStr like "2025-01-01" or "2025-01"
-  const parts=dateStr.split('-');
-  const y=parseInt(parts[0]),m=parseInt(parts[1]);
-  const q=Math.ceil(m/3);
-  return `Q${q} FY${String(y).slice(2)}`;
+function isDateVal(v){
+  // Matches: 2025-01-01, 2025-01, 1/1/2025, 01/01/2025, 4/1/2026 etc.
+  return /^\d{1,4}[-\/]\d{1,2}([-\/]\d{2,4})?$/.test(v);
 }
 
 function toYM(dateStr){
-  // normalise to YYYY-MM
-  return dateStr.slice(0,7);
+  const s = String(dateStr||'').trim();
+  // Format: YYYY-MM-DD or YYYY-MM
+  if(/^\d{4}-\d{2}/.test(s)) return s.slice(0,7);
+  // Format: M/D/YYYY or MM/DD/YYYY (month first, day always 1 in this dataset)
+  if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){
+    const [m,,y]=s.split('/');
+    return `${y}-${m.padStart(2,'0')}`;
+  }
+  // Format: D/M/YYYY fallback — if month > 12 it must be day first
+  if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)){
+    const [a,b,y]=s.split('/');
+    const month = parseInt(a)>12 ? b : a; // if first part > 12, it's the day
+    return `${y}-${String(month).padStart(2,'0')}`;
+  }
+  return s.slice(0,7);
+}
+
+function toQuarter(dateStr){
+  const ym = toYM(String(dateStr||''));
+  const [y,m] = ym.split('-').map(Number);
+  if(isNaN(y)||isNaN(m)) return 'Unknown';
+  return `Q${Math.ceil(m/3)} FY${String(y).slice(2)}`;
+}
+
+function detectDateCols(row){
+  const keys = Object.keys(row);
+  const cohortCol = keys.find(k=>/cohort/i.test(k)&&/month|date/i.test(k))
+    || keys.find(k=>/cohort/i.test(k))
+    || keys[0];
+  const activeCol = keys.find(k=>/active/i.test(k)&&/month|date/i.test(k))
+    || keys.find(k=>/active/i.test(k))
+    || keys[1];
+  return {cohortCol, activeCol};
 }
 
 function fmtDate(ym){
@@ -233,25 +270,48 @@ function showError(msg){
 let D=[],cohorts=[],actMonths=[],cohortQs=[],activeQs=[],fm=[],trend=[],lk={},totalGMVByMonth={};
 
 function initData(raw){
-  // Normalise date fields to YYYY-MM and add quarter fields
+  if(!raw.length) return;
+
+  // Auto-detect column names — handles any CSV export format
+  const {cohortCol, activeCol} = detectDateCols(raw[0]);
+
+  // Auto-detect numeric column names (flexible — works if columns are renamed)
+  const keys = Object.keys(raw[0]);
+  const findCol = (...terms) => keys.find(k=>terms.every(t=>k.toLowerCase().includes(t))) || '';
+
+  const newResCol        = findCol('new','res') && !findCol('new','res','gmv') && !findCol('new','res','txn') && !findCol('new','trans')
+    ? findCol('new_res') || keys.find(k=>/^new_res$/.test(k)) || findCol('new','res')
+    : keys.find(k=>/^new_res$/.test(k)) || findCol('new','res');
+  const retainedResCol   = keys.find(k=>/^retained_res$/.test(k))      || findCol('retained','res');
+  const totalResCol      = keys.find(k=>/^total_res$/.test(k))          || findCol('total','res');
+  const newGMVCol        = keys.find(k=>/^new_res_gmv$/.test(k))        || findCol('new','gmv');
+  const retainedGMVCol   = keys.find(k=>/^retained_res_gmv$/.test(k))   || findCol('retained','gmv');
+  const totalGMVCol      = keys.find(k=>/^total_res_gmv$/.test(k))      || findCol('total','gmv');
+  const newTxnsCol       = keys.find(k=>/^new_res_txns$/.test(k))       || findCol('new','txn');
+  const retainedTxnsCol  = keys.find(k=>/^retained_res_txns$/.test(k))  || findCol('retained','txn');
+  const totalTxnsCol     = keys.find(k=>/^total_res_txns$/.test(k))     || findCol('total','txn');
+  const transactingCol   = keys.find(k=>/^transacting_res$/.test(k))    || findCol('transacting');
+  const newTransCol      = keys.find(k=>/^new_transacting_res$/.test(k))|| findCol('new','transact');
+  const retTransCol      = keys.find(k=>/^retained_transacting_res$/.test(k))|| findCol('retained','transact');
+
   D=raw.map(r=>({
     ...r,
-    cohort: toYM(String(r.cohort_month)),
-    active:  toYM(String(r.active_month)),
-    cohort_q: toQuarter(String(r.cohort_month)),
-    active_q:  toQuarter(String(r.active_month)),
-    new_res:   +r.new_res,
-    retained_res: +r.retained_res,
-    total_res: +r.total_res,
-    new_gmv:   +r.new_res_gmv,
-    retained_gmv: +r.retained_res_gmv,
-    total_gmv: +r.total_res_gmv,
-    new_txns:  +r.new_res_txns,
-    retained_txns: +r.retained_res_txns,
-    total_txns: +r.total_res_txns,
-    transacting: +r.transacting_res,
-    new_transacting: +r.new_transacting_res,
-    retained_transacting: +r.retained_transacting_res,
+    cohort:    toYM(String(r[cohortCol]||'')),
+    active:    toYM(String(r[activeCol]||'')),
+    cohort_q:  toQuarter(String(r[cohortCol]||'')),
+    active_q:  toQuarter(String(r[activeCol]||'')),
+    new_res:          +(r[newResCol]||0),
+    retained_res:     +(r[retainedResCol]||0),
+    total_res:        +(r[totalResCol]||0),
+    new_gmv:          +(r[newGMVCol]||0),
+    retained_gmv:     +(r[retainedGMVCol]||0),
+    total_gmv:        +(r[totalGMVCol]||0),
+    new_txns:         +(r[newTxnsCol]||0),
+    retained_txns:    +(r[retainedTxnsCol]||0),
+    total_txns:       +(r[totalTxnsCol]||0),
+    transacting:      +(r[transactingCol]||0),
+    new_transacting:  +(r[newTransCol]||0),
+    retained_transacting: +(r[retTransCol]||0),
   }));
 
   const sortQ=arr=>arr.sort((a,b)=>{
